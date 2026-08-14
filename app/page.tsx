@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Meilisearch } from "meilisearch";
-import { ChevronDown, ChevronUp, Loader2, AlertCircle, Search, ShieldCheck } from "lucide-react";
+import { ChevronDown, Loader2, AlertCircle, Search, ShieldCheck } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 // Biến môi trường
 const API_CONFIG_URL =
@@ -87,6 +88,7 @@ export default function Home() {
   const [indexName, setIndexName] = useState<string>(DEFAULT_INDEX_NAME);
   const [error, setError] = useState<string | null>(null);
   const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
+  const router = useRouter();
 
   // Khởi tạo Meilisearch từ Backend
   useEffect(() => {
@@ -116,7 +118,7 @@ export default function Home() {
     initMeilisearch();
   }, []);
 
-  // Xử lý truy vấn tìm kiếm
+  // Xử lý truy vấn tìm kiếm với debounce (300ms) tránh call API liên tục
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
@@ -126,10 +128,10 @@ export default function Home() {
 
     if (!client) return;
 
-    // Đánh dấu loading ngay lập tức khi user gõ phím
+    // Bật trạng thái loading ngay khi người dùng bắt đầu nhập (trước khi hết thời gian debounce)
     setLoading(true);
 
-    const search = async () => {
+    const handler = setTimeout(async () => {
       try {
         const index = client.index(indexName);
         const searchRes = await index.search(query, { limit: 30 });
@@ -139,10 +141,12 @@ export default function Home() {
       } finally {
         setLoading(false);
       }
-    };
+    }, 300); // Debounce time 300ms tối ưu trải nghiệm gõ phím
 
-    const timeoutId = setTimeout(search, 150);
-    return () => clearTimeout(timeoutId);
+    // Hủy timeout cũ nếu người dùng tiếp tục nhập ký tự mới trước 300ms
+    return () => {
+      clearTimeout(handler);
+    };
   }, [query, client, indexName]);
 
   const getInitials = (fullName?: string) => {
@@ -232,19 +236,10 @@ export default function Home() {
                             </div>
 
                             <button
-                              onClick={() =>
-                                toggleExpand(
-                                  student.id || student.student_code
-                                )
-                              }
+                              onClick={() => router.push(`/students/${student.student_code}`)}
                               className="text-[11px] text-blue-600 dark:text-blue-400 font-medium hover:underline flex items-center gap-0.5"
                             >
-                              Chi tiết{" "}
-                              {isExpanded ? (
-                                <ChevronUp className="w-3 h-3" />
-                              ) : (
-                                <ChevronDown className="w-3 h-3" />
-                              )}
+                              Chi tiết <ChevronDown className="w-3 h-3 -rotate-90" />
                             </button>
                           </div>
 
@@ -354,7 +349,7 @@ export default function Home() {
               <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 flex items-start gap-2">
                 <ShieldCheck className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Hệ thống tra cứu xác thực thông tin sinh viên và văn bằng chính thức của EPU.
+                  Hệ thống tra cứu thông tin sinh viên
                 </p>
               </div>
             </div>
